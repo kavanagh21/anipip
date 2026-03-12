@@ -1,0 +1,22 @@
+[project]
+name = "analysispipeline"
+version = "0.1.0"
+description = "A PyQt6-based application for building linear image analysis pipelines with a node-based visual editor"
+requires-python = ">=3.10"
+dependencies = [
+    "PyQt6>=6.5.0",
+    "numpy>=1.24.0",
+    "Pillow>=10.0.0",
+    "tifffile>=2023.0.0",
+    "scikit-image>=0.21.0",
+]
+
+[project.scripts]
+analysispipeline = "main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["core*", "gui*", "plugins*"]

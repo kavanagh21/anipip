@@ -1,0 +1,569 @@
+{
+  "version": "2.0",
+  "nodes": [
+    {
+      "node_id": "zproj_c0",
+      "plugin_name": "Z-Projection",
+      "parameters": {
+        "method": "Mean",
+        "blur_filter": false
+      },
+      "position": [
+        100,
+        420
+      ]
+    },
+    {
+      "node_id": "zproj_c1",
+      "plugin_name": "Z-Projection",
+      "parameters": {
+        "method": "Mean",
+        "blur_filter": false
+      },
+      "position": [
+        500,
+        420
+      ]
+    },
+    {
+      "node_id": "zproj_c2",
+      "plugin_name": "Z-Projection",
+      "parameters": {
+        "method": "Mean",
+        "blur_filter": false
+      },
+      "position": [
+        900,
+        420
+      ]
+    },
+    {
+      "node_id": "bgsub_c0",
+      "plugin_name": "Background Subtraction",
+      "parameters": {
+        "method": "Gaussian",
+        "gaussian_radius": 150.0
+      },
+      "position": [
+        100,
+        580
+      ]
+    },
+    {
+      "node_id": "bgsub_c1",
+      "plugin_name": "Background Subtraction",
+      "parameters": {
+        "method": "Gaussian",
+        "gaussian_radius": 100.0
+      },
+      "position": [
+        500,
+        580
+      ]
+    },
+    {
+      "node_id": "bgsub_c2",
+      "plugin_name": "Background Subtraction",
+      "parameters": {
+        "method": "Gaussian",
+        "gaussian_radius": 100.0
+      },
+      "position": [
+        900,
+        580
+      ]
+    },
+    {
+      "node_id": "noise_c0",
+      "plugin_name": "Noise Floor",
+      "parameters": {
+        "sigma_threshold": 4.0,
+        "noise_estimate_percentile": 60.0
+      },
+      "position": [
+        100,
+        740
+      ]
+    },
+    {
+      "node_id": "noise_c1",
+      "plugin_name": "Noise Floor",
+      "parameters": {
+        "sigma_threshold": 3.5,
+        "noise_estimate_percentile": 60.0
+      },
+      "position": [
+        500,
+        740
+      ]
+    },
+    {
+      "node_id": "noise_c2",
+      "plugin_name": "Noise Floor",
+      "parameters": {
+        "sigma_threshold": 1.0,
+        "noise_estimate_percentile": 60.0
+      },
+      "position": [
+        900,
+        740
+      ]
+    },
+    {
+      "node_id": "norm_c0",
+      "plugin_name": "Normalize Image",
+      "parameters": {
+        "method": "Percentile",
+        "min_percentile": 0.94,
+        "max_percentile": 0.995
+      },
+      "position": [
+        100,
+        900
+      ]
+    },
+    {
+      "node_id": "norm_c1",
+      "plugin_name": "Normalize Image",
+      "parameters": {
+        "method": "Percentile",
+        "min_percentile": 0.97,
+        "max_percentile": 0.99
+      },
+      "position": [
+        500,
+        900
+      ]
+    },
+    {
+      "node_id": "norm_c2",
+      "plugin_name": "Normalize Image",
+      "parameters": {
+        "method": "Percentile",
+        "min_percentile": 0.5,
+        "max_percentile": 0.99
+      },
+      "position": [
+        900,
+        900
+      ]
+    },
+    {
+      "node_id": "mask_c0",
+      "plugin_name": "Create Mask",
+      "parameters": {
+        "sd_multiplier": 0.7,
+        "min_object_size": 15,
+        "opening_radius": 0,
+        "closing_radius": 3
+      },
+      "position": [
+        100,
+        1060
+      ]
+    },
+    {
+      "node_id": "mask_c1",
+      "plugin_name": "Create Mask",
+      "parameters": {
+        "sd_multiplier": 1.0,
+        "min_object_size": 10,
+        "opening_radius": 1,
+        "closing_radius": 3
+      },
+      "position": [
+        500,
+        1060
+      ]
+    },
+    {
+      "node_id": "mask_c2",
+      "plugin_name": "Create Mask",
+      "parameters": {
+        "sd_multiplier": 1.0,
+        "min_object_size": 15,
+        "opening_radius": 0,
+        "closing_radius": 1
+      },
+      "position": [
+        900,
+        1060
+      ]
+    },
+    {
+      "node_id": "overlay",
+      "plugin_name": "Channel Overlay",
+      "parameters": {
+        "ch1_color": "Blue",
+        "ch1_weight": 1.0,
+        "ch2_color": "Magenta",
+        "ch2_weight": 1.0,
+        "ch3_color": "Green",
+        "ch3_weight": 1.0
+      },
+      "position": [
+        1350,
+        900
+      ]
+    },
+    {
+      "node_id": "coloc_viz",
+      "plugin_name": "Coloc Visualization",
+      "parameters": {
+        "ch1_color": "Blue",
+        "ch2_color": "Magenta",
+        "ch3_color": "Green",
+        "highlight_overlap": true,
+        "overlap_boost": 1.3
+      },
+      "position": [
+        1350,
+        1085
+      ]
+    },
+    {
+      "node_id": "coloc_01",
+      "plugin_name": "Colocalization",
+      "parameters": {
+        "threshold_method": "Otsu",
+        "percentile": 90.0,
+        "aggregate_mode": "Weighted",
+        "compute_icq": true,
+        "compute_volumetric": false,
+        "compute_costes": false,
+        "compute_object_3d": false
+      },
+      "position": [
+        90,
+        1284
+      ]
+    },
+    {
+      "node_id": "coloc_02",
+      "plugin_name": "Colocalization",
+      "parameters": {
+        "threshold_method": "Otsu",
+        "percentile": 90.0,
+        "aggregate_mode": "Weighted",
+        "compute_icq": true,
+        "compute_volumetric": false,
+        "compute_costes": false,
+        "compute_object_3d": false
+      },
+      "position": [
+        500,
+        1300
+      ]
+    },
+    {
+      "node_id": "coloc_12",
+      "plugin_name": "Colocalization",
+      "parameters": {
+        "threshold_method": "Otsu",
+        "percentile": 90.0,
+        "aggregate_mode": "Weighted",
+        "compute_icq": true,
+        "compute_volumetric": false,
+        "compute_costes": false,
+        "compute_object_3d": false
+      },
+      "position": [
+        900,
+        1300
+      ]
+    },
+    {
+      "node_id": "export_01",
+      "plugin_name": "Spreadsheet Exporter",
+      "parameters": {
+        "format": "Excel (.xlsx)",
+        "output_path": "",
+        "show_in_viewer": true
+      },
+      "position": [
+        100,
+        1460
+      ]
+    },
+    {
+      "node_id": "export_02",
+      "plugin_name": "Spreadsheet Exporter",
+      "parameters": {
+        "format": "Excel (.xlsx)",
+        "output_path": "",
+        "show_in_viewer": true
+      },
+      "position": [
+        500,
+        1460
+      ]
+    },
+    {
+      "node_id": "export_12",
+      "plugin_name": "Spreadsheet Exporter",
+      "parameters": {
+        "format": "Excel (.xlsx)",
+        "output_path": "",
+        "show_in_viewer": true
+      },
+      "position": [
+        900,
+        1460
+      ]
+    },
+    {
+      "node_id": "imgexp_comp",
+      "plugin_name": "Image Exporter",
+      "parameters": {
+        "output_path": "",
+        "format": "TIFF"
+      },
+      "position": [
+        1350,
+        1300
+      ]
+    },
+    {
+      "node_id": "imgexp_coloc",
+      "plugin_name": "Image Exporter",
+      "parameters": {
+        "output_path": "",
+        "format": "TIFF"
+      },
+      "position": [
+        1350,
+        1460
+      ]
+    },
+    {
+      "node_id": "c6af365c",
+      "plugin_name": "Z-Stack Loader",
+      "parameters": {
+        "file_path": "C:/Julie/Liver_1/liver_XY1771334740_Z00_T0_C0.tif",
+        "image_type": "Z-Stack"
+      },
+      "position": [
+        102,
+        281
+      ]
+    },
+    {
+      "node_id": "86a65bdb",
+      "plugin_name": "Z-Stack Loader",
+      "parameters": {
+        "file_path": "C:/Julie/Liver_1/liver_XY1771334740_Z00_T0_C1.tif",
+        "image_type": "Z-Stack"
+      },
+      "position": [
+        508,
+        273
+      ]
+    },
+    {
+      "node_id": "19c92367",
+      "plugin_name": "Z-Stack Loader",
+      "parameters": {
+        "file_path": "C:/Julie/Liver_1/liver_XY1771334740_Z00_T0_C2.tif",
+        "image_type": "Z-Stack"
+      },
+      "position": [
+        884,
+        263
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "source_node_id": "zproj_c0",
+      "source_port": "image_out",
+      "target_node_id": "bgsub_c0",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "zproj_c1",
+      "source_port": "image_out",
+      "target_node_id": "bgsub_c1",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "zproj_c2",
+      "source_port": "image_out",
+      "target_node_id": "bgsub_c2",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "bgsub_c0",
+      "source_port": "image_out",
+      "target_node_id": "noise_c0",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "bgsub_c1",
+      "source_port": "image_out",
+      "target_node_id": "noise_c1",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "bgsub_c2",
+      "source_port": "image_out",
+      "target_node_id": "noise_c2",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "noise_c0",
+      "source_port": "image_out",
+      "target_node_id": "norm_c0",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "noise_c1",
+      "source_port": "image_out",
+      "target_node_id": "norm_c1",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "noise_c2",
+      "source_port": "image_out",
+      "target_node_id": "norm_c2",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "norm_c0",
+      "source_port": "image_out",
+      "target_node_id": "mask_c0",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "norm_c1",
+      "source_port": "image_out",
+      "target_node_id": "mask_c1",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "norm_c2",
+      "source_port": "image_out",
+      "target_node_id": "mask_c2",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "norm_c0",
+      "source_port": "image_out",
+      "target_node_id": "overlay",
+      "target_port": "ch1_in"
+    },
+    {
+      "source_node_id": "norm_c1",
+      "source_port": "image_out",
+      "target_node_id": "overlay",
+      "target_port": "ch2_in"
+    },
+    {
+      "source_node_id": "norm_c2",
+      "source_port": "image_out",
+      "target_node_id": "overlay",
+      "target_port": "ch3_in"
+    },
+    {
+      "source_node_id": "mask_c0",
+      "source_port": "image_out",
+      "target_node_id": "coloc_viz",
+      "target_port": "mask1_in"
+    },
+    {
+      "source_node_id": "mask_c1",
+      "source_port": "image_out",
+      "target_node_id": "coloc_viz",
+      "target_port": "mask2_in"
+    },
+    {
+      "source_node_id": "mask_c2",
+      "source_port": "image_out",
+      "target_node_id": "coloc_viz",
+      "target_port": "mask3_in"
+    },
+    {
+      "source_node_id": "noise_c0",
+      "source_port": "image_out",
+      "target_node_id": "coloc_01",
+      "target_port": "image1_in"
+    },
+    {
+      "source_node_id": "noise_c1",
+      "source_port": "image_out",
+      "target_node_id": "coloc_01",
+      "target_port": "image2_in"
+    },
+    {
+      "source_node_id": "noise_c0",
+      "source_port": "image_out",
+      "target_node_id": "coloc_02",
+      "target_port": "image1_in"
+    },
+    {
+      "source_node_id": "noise_c2",
+      "source_port": "image_out",
+      "target_node_id": "coloc_02",
+      "target_port": "image2_in"
+    },
+    {
+      "source_node_id": "noise_c1",
+      "source_port": "image_out",
+      "target_node_id": "coloc_12",
+      "target_port": "image1_in"
+    },
+    {
+      "source_node_id": "noise_c2",
+      "source_port": "image_out",
+      "target_node_id": "coloc_12",
+      "target_port": "image2_in"
+    },
+    {
+      "source_node_id": "coloc_01",
+      "source_port": "measurements",
+      "target_node_id": "export_01",
+      "target_port": "measurements"
+    },
+    {
+      "source_node_id": "coloc_02",
+      "source_port": "measurements",
+      "target_node_id": "export_02",
+      "target_port": "measurements"
+    },
+    {
+      "source_node_id": "coloc_12",
+      "source_port": "measurements",
+      "target_node_id": "export_12",
+      "target_port": "measurements"
+    },
+    {
+      "source_node_id": "overlay",
+      "source_port": "image_out",
+      "target_node_id": "imgexp_comp",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "coloc_viz",
+      "source_port": "image_out",
+      "target_node_id": "imgexp_coloc",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "c6af365c",
+      "source_port": "image_out",
+      "target_node_id": "zproj_c0",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "86a65bdb",
+      "source_port": "image_out",
+      "target_node_id": "zproj_c1",
+      "target_port": "image_in"
+    },
+    {
+      "source_node_id": "19c92367",
+      "source_port": "image_out",
+      "target_node_id": "zproj_c2",
+      "target_port": "image_in"
+    }
+  ]
+}
