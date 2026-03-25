@@ -294,6 +294,10 @@ class ImageViewer(QWidget):
 
     def _array_to_pixmap(self, array: np.ndarray) -> QPixmap:
         """Convert a NumPy array to QPixmap."""
+        # Collapse extra leading dimensions (e.g. a stray batch dim)
+        while array.ndim > 3:
+            array = array[0]
+
         # Normalize to 8-bit for display
         if array.dtype == np.uint16:
             array = (array / 256).astype(np.uint8)
@@ -309,20 +313,28 @@ class ImageViewer(QWidget):
             # Grayscale
             h, w = array.shape
             qimage = QImage(array.data, w, h, w, QImage.Format.Format_Grayscale8)
-        elif array.shape[2] == 3:
+        elif array.ndim == 3 and array.shape[2] == 3:
             # RGB
             h, w, _ = array.shape
             qimage = QImage(array.data, w, h, w * 3, QImage.Format.Format_RGB888)
-        elif array.shape[2] == 4:
+        elif array.ndim == 3 and array.shape[2] == 4:
             # RGBA
             h, w, _ = array.shape
             qimage = QImage(array.data, w, h, w * 4, QImage.Format.Format_RGBA8888)
-        else:
-            # Single channel as grayscale
-            array = array[:, :, 0]
+        elif array.ndim == 3 and array.shape[2] in (1, 2):
+            # Single/dual channel — take first channel as grayscale
+            array = np.ascontiguousarray(array[:, :, 0])
             h, w = array.shape
-            array = np.ascontiguousarray(array)
             qimage = QImage(array.data, w, h, w, QImage.Format.Format_Grayscale8)
+        elif array.ndim == 3:
+            # 3D but last dim is too large to be channels (e.g. spatial) —
+            # treat as grayscale by taking max projection or first slice
+            array = np.ascontiguousarray(array[:, :, 0])
+            h, w = array.shape
+            qimage = QImage(array.data, w, h, w, QImage.Format.Format_Grayscale8)
+        else:
+            # 1D or 0D — shouldn't happen, but guard against it
+            raise ValueError(f"Cannot display array with shape {array.shape}")
 
         return QPixmap.fromImage(qimage)
 

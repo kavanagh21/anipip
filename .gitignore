@@ -16,6 +16,16 @@ julie/
 .vscode/
 .idea/
 
+# Build artifacts
+build/
+dist/
+*.spec
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Data files
+*.tif
+*.tiff
+*.json

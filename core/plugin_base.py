@@ -44,6 +44,11 @@ class BasePlugin(ABC):
         for param in self.parameters:
             self._param_values[param.name] = param.default
 
+        # Set by the pipeline engine during execution — the source folder
+        # from the most recently seen ImageContainer with a source_path.
+        # Plugins can use this as a fallback for "save to source folder".
+        self._pipeline_source_folder: Optional["Path"] = None
+
     # ------------------------------------------------------------------
     # Parameter helpers
     # ------------------------------------------------------------------

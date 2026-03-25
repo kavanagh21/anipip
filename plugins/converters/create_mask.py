@@ -129,9 +129,26 @@ class CreateMask(BasePlugin):
             med = float(np.median(bg))
             mad = float(np.median(np.abs(bg - med)))
             robust_sig = 1.4826 * mad
-            thr = med + sd * robust_sig
 
-        thr = max(0.01, min(0.99, thr))
+            if robust_sig < 1e-6:
+                # Background has zero variance (e.g. after noise floor
+                # subtraction zeroed background pixels).  The SD
+                # multiplier can't work as "N sigmas above background"
+                # because sigma is zero.  Instead, map the SD slider to
+                # a percentile of the non-zero (signal) distribution:
+                #   low SD  → low percentile → captures more signal
+                #   high SD → high percentile → only brightest signal
+                nonzero = gray[gray > 0]
+                if nonzero.size > 100:
+                    frac = min(1.0, max(0.0, (sd - 0.5) / 19.5))
+                    pct = 5.0 + frac * 90.0
+                    thr = float(np.percentile(nonzero, pct))
+                else:
+                    thr = med + sd * robust_sig
+            else:
+                thr = med + sd * robust_sig
+
+        thr = max(0.001, min(0.99, thr))
         mask = (gray > thr).astype(np.float32)
 
         if min_size > 0:

@@ -585,12 +585,16 @@ class Pipeline:
         self._port_results.clear()
 
         last_result: Optional[PipelineData] = None
+        # Track source folder from any ImageContainer seen during execution
+        source_folder = None
 
         for i, node in enumerate(ordered):
             if stop_check and stop_check():
                 return None
 
             node.plugin.set_all_parameters(node.parameters)
+            # Propagate source folder to all plugins
+            node.plugin._pipeline_source_folder = source_folder
 
             # Gather inputs from upstream connections
             inputs: dict[str, PipelineData] = {}
@@ -611,11 +615,14 @@ class Pipeline:
                 self._port_results[node.node_id] = outputs or {}
 
                 # Store first ImageContainer (or any output) for preview
+                # and track source folder
                 preview = None
                 for val in (outputs or {}).values():
                     if isinstance(val, ImageContainer):
-                        preview = val
-                        break
+                        if preview is None:
+                            preview = val
+                        if val.metadata.source_path and source_folder is None:
+                            source_folder = val.metadata.source_path.parent
                 if preview is None and outputs:
                     preview = next(iter(outputs.values()), None)
 
@@ -771,6 +778,16 @@ class Pipeline:
                     batch_loader_ids.add(node.node_id)
 
         no_op = lambda *_args: None
+        source_folder = None
+
+        # Scan cached results for source folder (from previous runs)
+        for nid, results in self._port_results.items():
+            for val in results.values():
+                if isinstance(val, ImageContainer) and val.metadata.source_path:
+                    source_folder = val.metadata.source_path.parent
+                    break
+            if source_folder:
+                break
 
         for node in ordered:
             if stop_check and stop_check():
@@ -782,6 +799,7 @@ class Pipeline:
                 continue
 
             node.plugin.set_all_parameters(node.parameters)
+            node.plugin._pipeline_source_folder = source_folder
 
             try:
                 if node.node_id in batch_loader_ids:
@@ -814,12 +832,14 @@ class Pipeline:
 
                 self._port_results[node.node_id] = outputs or {}
 
-                # Store preview result
+                # Store preview result and track source folder
                 preview = None
                 for val in (outputs or {}).values():
                     if isinstance(val, ImageContainer):
-                        preview = val
-                        break
+                        if preview is None:
+                            preview = val
+                        if val.metadata.source_path and source_folder is None:
+                            source_folder = val.metadata.source_path.parent
                 if preview is None and outputs:
                     preview = next(iter(outputs.values()), None)
                 self._last_results[node.node_id] = preview

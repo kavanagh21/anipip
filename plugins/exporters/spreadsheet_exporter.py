@@ -9,29 +9,36 @@ from core.image_container import ImageContainer
 from core.table_data import TableData
 from core.pipeline_data import PipelineData
 from core.ports import InputPort, OutputPort, Port
-from core.parameters import ChoiceParameter, FileParameter, BoolParameter
+from core.parameters import BoolParameter, ChoiceParameter, FileParameter, StringParameter
 
 
 class SpreadsheetExporter(BasePlugin):
     """Write measurement / tabular data to CSV or Excel.
 
-    This is a *sink* node — it has an input port but no output ports.
-
     In **batch mode** (the default when running a batch pipeline), rows are
     accumulated via :meth:`batch_initialize` / :meth:`batch_finalize` and
     written once at the end.  In **single mode**, the file is written
     immediately on each execution.
+
+    Connect the optional *Image In* port to obtain the source image
+    folder for *Save to Source Image Folder*.
+
+    For Excel output you can specify a sheet name.  When appending to
+    an existing sheet whose columns do not match the incoming data, a
+    new sheet is created with ``(clash)`` appended to the name.
     """
 
     name = "Spreadsheet Exporter"
     category = "Exporters"
     description = "Export tabular measurement data to CSV or Excel"
     help_text = (
-        "Writes measurement table data to a CSV or Excel (.xlsx) file. In "
-        "batch mode, rows are accumulated across all images and written once "
-        "at the end. Enable \"Show in internal viewer\" to display results in "
-        "the app. Supports append mode for adding to existing files. Excel "
-        "export requires the openpyxl package."
+        "Writes measurement table data to a CSV or Excel (.xlsx) file. "
+        "Enable \"Save to Source Image Folder\" and connect the optional "
+        "Image In port to write alongside the original images. Set a "
+        "custom filename to control the output name. For Excel, specify "
+        "a sheet name \u2014 if the sheet has existing data with different "
+        "columns, a new sheet with \"(clash)\" is created. In batch mode, "
+        "rows are accumulated and written once at the end."
     )
     icon = None
 
@@ -39,12 +46,23 @@ class SpreadsheetExporter(BasePlugin):
 
     ports: list[Port] = [
         InputPort("measurements", TableData, label="Measurements"),
+        InputPort("image_in", ImageContainer, label="Image In", optional=True),
         OutputPort("table_out", TableData, label="Table Out"),
     ]
 
     # -- Parameters ----------------------------------------------------
 
     parameters = [
+        BoolParameter(
+            name="save_to_source_folder",
+            label="Save to Source Image Folder",
+            default=False,
+        ),
+        BoolParameter(
+            name="use_output_subfolder",
+            label="Save into 'output' subfolder",
+            default=False,
+        ),
         ChoiceParameter(
             name="format",
             label="Format",
@@ -52,16 +70,22 @@ class SpreadsheetExporter(BasePlugin):
             default="CSV",
         ),
         FileParameter(
-            name="output_path",
-            label="Output Path",
+            name="output_folder",
+            label="Output Folder",
             default="",
-            filter="CSV Files (*.csv);;Excel Files (*.xlsx);;All Files (*.*)",
-            save_mode=True,
+            folder_mode=True,
         ),
-        BoolParameter(
-            name="append_mode",
-            label="Append to existing file",
-            default=False,
+        StringParameter(
+            name="custom_filename",
+            label="Custom Filename",
+            default="",
+            placeholder="e.g. results (without extension)",
+        ),
+        StringParameter(
+            name="sheet_name",
+            label="Excel Sheet Name",
+            default="Measurements",
+            placeholder="e.g. Colocalization",
         ),
         BoolParameter(
             name="show_in_viewer",
@@ -74,19 +98,19 @@ class SpreadsheetExporter(BasePlugin):
         super().__init__()
         self._accumulated: TableData | None = None
         self._last_table: TableData | None = None
+        self._source_folder: Path | None = None
 
     # -- Batch lifecycle -----------------------------------------------
 
     def batch_initialize(self) -> None:
-        """Start a fresh accumulator for the batch run."""
         self._accumulated = TableData()
+        self._source_folder = None
 
     def batch_finalize(self) -> None:
-        """Write the accumulated table after the batch completes."""
         if self._accumulated and self._accumulated.rows:
-            if self.get_parameter("output_path"):
-                self._write_table(self._accumulated)
-            # Keep the final accumulated table available for the viewer
+            path = self._resolve_output_path()
+            if path:
+                self._write_table(self._accumulated, path)
             self._last_table = self._accumulated
         self._accumulated = None
 
@@ -97,7 +121,6 @@ class SpreadsheetExporter(BasePlugin):
         image: ImageContainer,
         progress_callback: Callable[[float], None],
     ) -> ImageContainer:
-        """Legacy interface — no-op pass-through."""
         return image
 
     def process_ports(
@@ -105,7 +128,6 @@ class SpreadsheetExporter(BasePlugin):
         inputs: dict[str, PipelineData],
         progress_callback: Callable[[float], None],
     ) -> dict[str, PipelineData]:
-        """Receive table data and either accumulate or write immediately."""
         progress_callback(0.1)
 
         table: TableData | None = inputs.get("measurements")
@@ -113,61 +135,103 @@ class SpreadsheetExporter(BasePlugin):
             progress_callback(1.0)
             return {}
 
+        # Capture source folder from any connected ImageContainer input
+        for inp in inputs.values():
+            if isinstance(inp, ImageContainer) and inp.metadata.source_path:
+                self._source_folder = inp.metadata.source_path.parent
+                break
+
         if self._accumulated is not None:
-            # Batch mode — accumulate rows
             self._accumulated = self._accumulated.merge(table)
         else:
-            # Single mode — write to file if a path is configured
-            if self.get_parameter("output_path"):
-                self._write_table(table)
+            path = self._resolve_output_path()
+            if path:
+                self._write_table(table, path)
 
-        # Store the current table for viewer access
         self._last_table = table
 
         progress_callback(1.0)
 
-        # Expose table on output port when show_in_viewer is enabled
         if self.get_parameter("show_in_viewer"):
             out = self._accumulated if self._accumulated is not None else table
             return {"table_out": out}
 
         return {}
 
-    # -- Writing ---------------------------------------------------
+    # -- Path resolution -----------------------------------------------
 
-    def _write_table(self, table: TableData) -> None:
-        """Write *table* using the configured format."""
+    def _resolve_output_path(self) -> Path | None:
+        """Build the full output file path from the current settings."""
+        save_to_source = self.get_parameter("save_to_source_folder")
+        custom_name = (self.get_parameter("custom_filename") or "").strip()
         fmt = self.get_parameter("format")
-        if fmt == "Excel (.xlsx)":
-            self._write_xlsx(table)
-        else:
-            self._write_csv(table)
 
-    def _write_csv(self, table: TableData) -> None:
-        """Write *table* to the configured CSV path."""
-        output_path = Path(self.get_parameter("output_path"))
-        append = self.get_parameter("append_mode")
+        ext = ".xlsx" if fmt == "Excel (.xlsx)" else ".csv"
 
+        # Strip extension if the user included one
+        if custom_name:
+            p = Path(custom_name)
+            if p.suffix.lower() in (".csv", ".xlsx", ".xls"):
+                custom_name = p.stem
+
+        filename = f"{custom_name}{ext}" if custom_name else f"measurements{ext}"
+
+        # Determine folder
+        folder: Path | None = None
+
+        if save_to_source:
+            # Try local _source_folder first, then pipeline-level fallback
+            sf = self._source_folder or self._pipeline_source_folder
+            if sf and sf.exists():
+                folder = sf
+
+        if folder is None:
+            folder_str = (self.get_parameter("output_folder") or "").strip()
+            if folder_str:
+                folder = Path(folder_str)
+
+        if folder is None:
+            return None
+
+        if self.get_parameter("use_output_subfolder"):
+            folder = folder / "output"
+
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder / filename
+
+    # -- Writing -------------------------------------------------------
+
+    def _write_table(self, table: TableData, output_path: Path) -> None:
+        fmt = self.get_parameter("format")
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        if append and output_path.exists():
-            # Append rows (skip header if file already has content)
+        if fmt == "Excel (.xlsx)":
+            self._write_xlsx(table, output_path)
+        else:
+            self._write_csv(table, output_path)
+
+    @staticmethod
+    def _write_csv(table: TableData, output_path: Path) -> None:
+        if output_path.exists():
+            # Append rows
             with open(output_path, "a", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=table.columns, extrasaction="ignore")
-                # Write header only if the file is empty
+                writer = csv.DictWriter(
+                    f, fieldnames=table.columns, extrasaction="ignore"
+                )
                 if output_path.stat().st_size == 0:
                     writer.writeheader()
                 for row in table.rows:
                     writer.writerow(row)
         else:
             with open(output_path, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=table.columns, extrasaction="ignore")
+                writer = csv.DictWriter(
+                    f, fieldnames=table.columns, extrasaction="ignore"
+                )
                 writer.writeheader()
                 for row in table.rows:
                     writer.writerow(row)
 
-    def _write_xlsx(self, table: TableData) -> None:
-        """Write *table* to an Excel .xlsx file via openpyxl."""
+    def _write_xlsx(self, table: TableData, output_path: Path) -> None:
         try:
             import openpyxl
         except ImportError:
@@ -176,25 +240,61 @@ class SpreadsheetExporter(BasePlugin):
                 "Install it with: pip install openpyxl"
             )
 
-        output_path = Path(self.get_parameter("output_path"))
-        append = self.get_parameter("append_mode")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        sheet_name = (self.get_parameter("sheet_name") or "").strip()
+        if not sheet_name:
+            sheet_name = "Measurements"
 
-        if append and output_path.exists():
+        if output_path.exists():
             wb = openpyxl.load_workbook(output_path)
-            ws = wb.active
         else:
             wb = openpyxl.Workbook()
-            ws = wb.active
-            ws.title = "Measurements"
-            # Write header row
+            # Remove the default empty sheet — we'll create our own
+            if wb.sheetnames == ["Sheet"]:
+                del wb["Sheet"]
+
+        if sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            # Check if existing columns match incoming columns
+            if ws.max_row and ws.max_row >= 1:
+                existing_cols = [
+                    ws.cell(row=1, column=c).value
+                    for c in range(1, ws.max_column + 1)
+                ]
+                # Strip None values from trailing empty columns
+                existing_cols = [
+                    c for c in existing_cols if c is not None
+                ]
+
+                if existing_cols and existing_cols != table.columns:
+                    # Column mismatch — create a new sheet with (clash)
+                    clash_name = f"{sheet_name} (clash)"
+                    # Find a unique name if (clash) already exists
+                    counter = 1
+                    while clash_name in wb.sheetnames:
+                        counter += 1
+                        clash_name = f"{sheet_name} (clash {counter})"
+
+                    ws = wb.create_sheet(title=clash_name)
+                    # Write header
+                    for col_idx, col_name in enumerate(
+                        table.columns, start=1
+                    ):
+                        ws.cell(row=1, column=col_idx, value=col_name)
+                # else: columns match — append below
+        else:
+            # Sheet doesn't exist yet — create it with header
+            ws = wb.create_sheet(title=sheet_name)
             for col_idx, col_name in enumerate(table.columns, start=1):
                 ws.cell(row=1, column=col_idx, value=col_name)
 
+        # Append data rows
         start_row = ws.max_row + 1
         for row_idx, row_data in enumerate(table.rows, start=start_row):
             for col_idx, col_name in enumerate(table.columns, start=1):
-                ws.cell(row=row_idx, column=col_idx, value=row_data.get(col_name, ""))
+                ws.cell(
+                    row=row_idx, column=col_idx,
+                    value=row_data.get(col_name, ""),
+                )
 
         wb.save(output_path)
 
@@ -202,8 +302,14 @@ class SpreadsheetExporter(BasePlugin):
 
     def validate_parameters(self) -> tuple[bool, list[str]]:
         errors = []
-        output_path = self.get_parameter("output_path")
+        save_to_source = self.get_parameter("save_to_source_folder")
+        output_folder = (self.get_parameter("output_folder") or "").strip()
         show_in_viewer = self.get_parameter("show_in_viewer")
-        if not output_path and not show_in_viewer:
-            errors.append("Either specify an output file path or enable 'Show in internal viewer'")
+
+        if not save_to_source and not output_folder and not show_in_viewer:
+            errors.append(
+                "Specify an output folder, enable 'Save to Source Image "
+                "Folder', or enable 'Show in internal viewer'"
+            )
+
         return len(errors) == 0, errors
