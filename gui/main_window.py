@@ -795,10 +795,12 @@ class MainWindow(QMainWindow):
 
     def _show_about(self) -> None:
         """Show about dialog."""
+        from main import __version__
         QMessageBox.about(
             self,
             "About Analysis Pipeline",
-            "Scientific Analysis Pipeline Tool\n\n"
+            f"Scientific Analysis Pipeline Tool\n"
+            f"Version {__version__}\n\n"
             "A visual pipeline editor for image analysis.\n\n"
             "Drag plugins from the browser onto the canvas,\n"
             "connect them to build your pipeline, and run.",

@@ -16,9 +16,11 @@ jobs:
           - os: windows-latest
             artifact_name: AnalysisPipeline-Windows
             asset_name: AnalysisPipeline-Windows.zip
+            sep: ";"
           - os: macos-latest
             artifact_name: AnalysisPipeline-macOS
             asset_name: AnalysisPipeline-macOS.zip
+            sep: ":"
 
     runs-on: ${{ matrix.os }}
 
@@ -37,15 +39,58 @@ jobs:
           pip install pyinstaller
           pip install "PyQt6>=6.5.0" "numpy>=1.24.0" "Pillow>=10.0.0" "tifffile>=2023.0.0" "scikit-image>=0.21.0" "openpyxl>=3.1.0"
 
-      - name: Build with PyInstaller (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          pyinstaller --name "AnalysisPipeline" --windowed --noconfirm --clean --add-data "plugins;plugins" --add-data "core;core" --add-data "gui;gui" --hidden-import "PyQt6.QtCore" --hidden-import "PyQt6.QtGui" --hidden-import "PyQt6.QtWidgets" --hidden-import "numpy" --hidden-import "PIL" --hidden-import "tifffile" --hidden-import "skimage" --hidden-import "openpyxl" --hidden-import "scipy" main.py
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller
+          --name "AnalysisPipeline"
+          --windowed
+          --noconfirm
+          --clean
+          --add-data "plugins${{ matrix.sep }}plugins"
+          --hidden-import "PyQt6.QtCore"
+          --hidden-import "PyQt6.QtGui"
+          --hidden-import "PyQt6.QtWidgets"
+          --hidden-import "numpy"
+          --hidden-import "PIL"
+          --hidden-import "PIL.Image"
+          --hidden-import "tifffile"
+          --hidden-import "skimage"
+          --hidden-import "skimage.filters"
+          --hidden-import "skimage.morphology"
+          --hidden-import "skimage.measure"
+          --hidden-import "skimage.exposure"
+          --hidden-import "skimage.util"
+          --hidden-import "openpyxl"
+          --hidden-import "scipy"
+          --hidden-import "scipy.ndimage"
+          --hidden-import "scipy.stats"
+          --hidden-import "core"
+          --hidden-import "core.plugin_base"
+          --hidden-import "core.image_container"
+          --hidden-import "core.parameters"
+          --hidden-import "core.pipeline"
+          --hidden-import "core.pipeline_data"
+          --hidden-import "core.table_data"
+          --hidden-import "core.ports"
+          --hidden-import "core.plugin_registry"
+          --hidden-import "core.settings"
+          --collect-submodules "core"
+          --collect-submodules "gui"
+          main.py
 
-      - name: Build with PyInstaller (macOS)
-        if: runner.os == 'macOS'
+      - name: Verify bundle contents
         run: |
-          pyinstaller --name "AnalysisPipeline" --windowed --noconfirm --clean --add-data "plugins:plugins" --add-data "core:core" --add-data "gui:gui" --hidden-import "PyQt6.QtCore" --hidden-import "PyQt6.QtGui" --hidden-import "PyQt6.QtWidgets" --hidden-import "numpy" --hidden-import "PIL" --hidden-import "tifffile" --hidden-import "skimage" --hidden-import "openpyxl" --hidden-import "scipy" main.py
+          echo "=== Checking plugins directory in bundle ==="
+          python -c "
+          import os
+          # Find the plugins dir in the dist
+          for root, dirs, files in os.walk('dist'):
+              for f in files:
+                  path = os.path.join(root, f)
+                  if 'plugin' in path.lower():
+                      print(path)
+          "
+        shell: bash
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
