@@ -189,8 +189,12 @@ class MainWindow(QMainWindow):
         self._preview_debounce_timer.setInterval(300)
         self._preview_debounce_timer.timeout.connect(self._run_preview)
 
-        # Discover plugins
-        plugins_dir = Path(__file__).parent.parent / "plugins"
+        # Discover plugins — handle PyInstaller frozen bundle
+        if getattr(sys, 'frozen', False):
+            base_dir = Path(sys._MEIPASS)
+        else:
+            base_dir = Path(__file__).parent.parent
+        plugins_dir = base_dir / "plugins"
         self.registry.discover_plugins(plugins_dir)
 
         # Setup UI
