@@ -284,6 +284,12 @@ class MainWindow(QMainWindow):
         # Help menu
         help_menu = menubar.addMenu("&Help")
 
+        check_updates_action = QAction("Check for &Updates...", self)
+        check_updates_action.triggered.connect(self._check_for_updates)
+        help_menu.addAction(check_updates_action)
+
+        help_menu.addSeparator()
+
         about_action = QAction("&About", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
@@ -792,6 +798,86 @@ class MainWindow(QMainWindow):
         """Show the plugin defaults settings dialog."""
         dialog = PluginDefaultsDialog(self.registry, self.settings, self)
         dialog.exec()
+
+    def _check_for_updates(self) -> None:
+        """Check GitHub for a newer release."""
+        from main import __version__
+        from core.updater import UpdateChecker, UpdateDownloader, launch_installer
+
+        self.statusBar().showMessage("Checking for updates...")
+        self._update_checker = UpdateChecker(__version__)
+
+        def on_update_available(version, download_url, release_notes):
+            self.statusBar().clearMessage()
+            reply = QMessageBox.question(
+                self,
+                "Update Available",
+                f"Version {version} is available (you have {__version__}).\n\n"
+                f"Do you want to download and install it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._download_update(version, download_url)
+
+        def on_no_update():
+            self.statusBar().clearMessage()
+            QMessageBox.information(
+                self, "No Updates", f"You are running the latest version ({__version__})."
+            )
+
+        def on_error(msg):
+            self.statusBar().clearMessage()
+            QMessageBox.warning(self, "Update Check Failed", msg)
+
+        self._update_checker.update_available.connect(on_update_available)
+        self._update_checker.no_update.connect(on_no_update)
+        self._update_checker.error.connect(on_error)
+        self._update_checker.start()
+
+    def _download_update(self, version: str, url: str) -> None:
+        """Download and launch the update installer."""
+        import sys
+        from core.updater import UpdateDownloader, launch_installer
+
+        if sys.platform == "win32":
+            filename = f"AnalysisPipeline-{version}-Setup.exe"
+        elif sys.platform == "darwin":
+            filename = f"AnalysisPipeline-{version}.dmg"
+        else:
+            QMessageBox.warning(self, "Update", "Auto-update is not supported on this platform.")
+            return
+
+        self._progress = QProgressDialog("Downloading update...", "Cancel", 0, 100, self)
+        self._progress.setWindowTitle("Downloading Update")
+        self._progress.setMinimumDuration(0)
+        self._progress.setValue(0)
+
+        self._update_downloader = UpdateDownloader(url, filename)
+
+        def on_progress(downloaded, total):
+            if total > 0:
+                self._progress.setValue(int(downloaded * 100 / total))
+
+        def on_finished(file_path):
+            self._progress.close()
+            reply = QMessageBox.information(
+                self,
+                "Download Complete",
+                f"Update downloaded. The application will now close and "
+                f"the installer will launch.",
+                QMessageBox.StandardButton.Ok,
+            )
+            launch_installer(file_path)
+
+        def on_error(msg):
+            self._progress.close()
+            QMessageBox.warning(self, "Download Failed", msg)
+
+        self._update_downloader.progress.connect(on_progress)
+        self._update_downloader.finished.connect(on_finished)
+        self._update_downloader.error.connect(on_error)
+        self._progress.canceled.connect(self._update_downloader.terminate)
+        self._update_downloader.start()
 
     def _show_about(self) -> None:
         """Show about dialog."""

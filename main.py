@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Application entry point for the Scientific Analysis Pipeline Tool."""
 
-__version__ = "0.1.1"
+__version__ = "0.2.0"
 
 import sys
 from PyQt6.QtWidgets import QApplication

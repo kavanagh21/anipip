@@ -9,21 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            artifact_name: AnalysisPipeline-Windows
-            asset_name: AnalysisPipeline-Windows.zip
-            sep: ";"
-          - os: macos-latest
-            artifact_name: AnalysisPipeline-macOS
-            asset_name: AnalysisPipeline-macOS.zip
-            sep: ":"
-
-    runs-on: ${{ matrix.os }}
-
+  build-windows:
+    runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,7 +24,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
-          pip install "PyQt6>=6.5.0" "numpy>=1.24.0" "Pillow>=10.0.0" "tifffile>=2023.0.0" "scikit-image>=0.21.0" "openpyxl>=3.1.0"
+          pip install "PyQt6>=6.5.0" "numpy>=1.24.0" "Pillow>=10.0.0" "tifffile>=2023.0.0" "scikit-image>=0.21.0" "openpyxl>=3.1.0" "packaging>=23.0"
 
       - name: Build with PyInstaller
         run: >
@@ -46,7 +33,7 @@ jobs:
           --windowed
           --noconfirm
           --clean
-          --add-data "plugins${{ matrix.sep }}plugins"
+          --add-data "plugins;plugins"
           --hidden-import "PyQt6.QtCore"
           --hidden-import "PyQt6.QtGui"
           --hidden-import "PyQt6.QtWidgets"
@@ -64,16 +51,8 @@ jobs:
           --hidden-import "scipy"
           --hidden-import "scipy.ndimage"
           --hidden-import "scipy.stats"
-          --hidden-import "core"
-          --hidden-import "core.plugin_base"
-          --hidden-import "core.image_container"
-          --hidden-import "core.parameters"
-          --hidden-import "core.pipeline"
-          --hidden-import "core.pipeline_data"
-          --hidden-import "core.table_data"
-          --hidden-import "core.ports"
-          --hidden-import "core.plugin_registry"
-          --hidden-import "core.settings"
+          --hidden-import "packaging"
+          --hidden-import "packaging.version"
           --collect-submodules "core"
           --collect-submodules "gui"
           main.py
@@ -83,7 +62,6 @@ jobs:
           echo "=== Checking plugins directory in bundle ==="
           python -c "
           import os
-          # Find the plugins dir in the dist
           for root, dirs, files in os.walk('dist'):
               for f in files:
                   path = os.path.join(root, f)
@@ -92,36 +70,115 @@ jobs:
           "
         shell: bash
 
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          cd dist
-          Compress-Archive -Path "AnalysisPipeline" -DestinationPath "${{ matrix.asset_name }}"
-        shell: pwsh
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        shell: bash
 
-      - name: Package (macOS)
-        if: runner.os == 'macOS'
+      - name: Build installer with Inno Setup
         run: |
-          cd dist
-          zip -r "${{ matrix.asset_name }}" "AnalysisPipeline.app"
+          iscc /DMyAppVersion="${{ steps.version.outputs.VERSION }}" installer\windows_setup.iss
 
-      - name: Upload artifact
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.asset_name }}
+          name: AnalysisPipeline-Windows-Installer
+          path: installer/AnalysisPipeline-${{ steps.version.outputs.VERSION }}-Windows-Setup.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install "PyQt6>=6.5.0" "numpy>=1.24.0" "Pillow>=10.0.0" "tifffile>=2023.0.0" "scikit-image>=0.21.0" "openpyxl>=3.1.0" "packaging>=23.0"
+          brew install create-dmg
+
+      - name: Build with PyInstaller
+        run: >
+          pyinstaller
+          --name "AnalysisPipeline"
+          --windowed
+          --noconfirm
+          --clean
+          --add-data "plugins:plugins"
+          --hidden-import "PyQt6.QtCore"
+          --hidden-import "PyQt6.QtGui"
+          --hidden-import "PyQt6.QtWidgets"
+          --hidden-import "numpy"
+          --hidden-import "PIL"
+          --hidden-import "PIL.Image"
+          --hidden-import "tifffile"
+          --hidden-import "skimage"
+          --hidden-import "skimage.filters"
+          --hidden-import "skimage.morphology"
+          --hidden-import "skimage.measure"
+          --hidden-import "skimage.exposure"
+          --hidden-import "skimage.util"
+          --hidden-import "openpyxl"
+          --hidden-import "scipy"
+          --hidden-import "scipy.ndimage"
+          --hidden-import "scipy.stats"
+          --hidden-import "packaging"
+          --hidden-import "packaging.version"
+          --collect-submodules "core"
+          --collect-submodules "gui"
+          main.py
+
+      - name: Verify bundle contents
+        run: |
+          echo "=== Checking plugins directory in bundle ==="
+          find dist -name "*.py" -path "*/plugin*" | head -40
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create DMG
+        run: |
+          create-dmg \
+            --volname "Analysis Pipeline" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --app-drop-link 425 178 \
+            --icon-size 100 \
+            --icon "AnalysisPipeline.app" 175 178 \
+            "AnalysisPipeline-${{ steps.version.outputs.VERSION }}-macOS.dmg" \
+            "dist/AnalysisPipeline.app"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnalysisPipeline-macOS-Installer
+          path: AnalysisPipeline-${{ steps.version.outputs.VERSION }}-macOS.dmg
 
   release:
-    needs: build
+    needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      - name: List artifacts
+        run: find . -type f | head -20
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            AnalysisPipeline-Windows/AnalysisPipeline-Windows.zip
-            AnalysisPipeline-macOS/AnalysisPipeline-macOS.zip
+            AnalysisPipeline-Windows-Installer/AnalysisPipeline-${{ steps.version.outputs.VERSION }}-Windows-Setup.exe
+            AnalysisPipeline-macOS-Installer/AnalysisPipeline-${{ steps.version.outputs.VERSION }}-macOS.dmg
